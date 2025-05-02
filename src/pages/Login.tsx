@@ -32,11 +32,11 @@ const Login = () => {
       } else {
         throw error;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
       toast({
         title: "Login Failed",
-        description: "Invalid email or password",
+        description: error?.message || "Invalid email or password",
         variant: "destructive",
       });
     } finally {
@@ -54,8 +54,10 @@ const Login = () => {
       if (success) {
         toast({
           title: "Registration Successful",
-          description: "Please check your email for confirmation",
+          description: "Please check your email for confirmation. You can login immediately if email confirmation is not required.",
         });
+        setEmail("");
+        setPassword("");
       } else {
         throw error;
       }
@@ -166,6 +168,9 @@ const Login = () => {
             <div className="mt-6 text-center text-sm">
               <p className="text-slate-500">
                 After registration, check your email for confirmation
+              </p>
+              <p className="text-slate-500 mt-1">
+                (You may be able to login immediately if email confirmation is disabled)
               </p>
             </div>
           </TabsContent>

@@ -3,6 +3,11 @@ import { supabase } from './supabase';
 // Placeholder for the Arya API key - will be replaced with environment variable in production
 const ARYA_API_KEY = import.meta.env.VITE_ARYA_API_KEY || 'your-arya-ai-key';
 
+// Helper function to get the current auth token
+const getAuthToken = () => {
+  return localStorage.getItem('supabase_access_token');
+};
+
 export const api = {
   // Transactions
   async getTransactions() {
@@ -124,5 +129,25 @@ export const api = {
       { name: "Sat", approved: 79, flagged: 12, blocked: 5 },
       { name: "Sun", approved: 85, flagged: 10, blocked: 3 }
     ];
+  },
+  
+  // Helper method to make authorized API calls to external services
+  async authorizedFetch(url: string, options: RequestInit = {}) {
+    const token = getAuthToken();
+    
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+    
+    const headers = {
+      ...options.headers,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+    
+    return fetch(url, {
+      ...options,
+      headers
+    });
   }
 };

@@ -1,10 +1,11 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { User } from '@supabase/supabase-js';
+import { User, Session } from '@supabase/supabase-js';
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -13,6 +14,7 @@ export const useAuth = () => {
       try {
         setLoading(true);
         const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
         setUser(session?.user ?? null);
       } catch (error) {
         console.error('Error getting session:', error);
@@ -25,6 +27,7 @@ export const useAuth = () => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
       setUser(session?.user ?? null);
     });
 
@@ -35,9 +38,16 @@ export const useAuth = () => {
 
   const signIn = async ({ email, password }: { email: string; password: string }) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      
       if (error) throw error;
-      return { success: true };
+      
+      // Store access token in localStorage for API calls
+      if (data?.session?.access_token) {
+        localStorage.setItem('supabase_access_token', data.session.access_token);
+      }
+      
+      return { success: true, session: data?.session };
     } catch (error) {
       console.error('Error signing in:', error);
       return { success: false, error };
@@ -46,15 +56,16 @@ export const useAuth = () => {
 
   const signUp = async ({ email, password }: { email: string; password: string }) => {
     try {
-      const { error } = await supabase.auth.signUp({ 
+      const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/login`
         }
       });
+      
       if (error) throw error;
-      return { success: true };
+      return { success: true, session: data?.session };
     } catch (error) {
       console.error('Error signing up:', error);
       return { success: false, error };
@@ -63,6 +74,9 @@ export const useAuth = () => {
 
   const signOut = async () => {
     try {
+      // Remove access token from localStorage
+      localStorage.removeItem('supabase_access_token');
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       return { success: true };
@@ -72,5 +86,17 @@ export const useAuth = () => {
     }
   };
 
-  return { user, loading, signIn, signUp, signOut };
+  const getAccessToken = () => {
+    return session?.access_token || localStorage.getItem('supabase_access_token');
+  };
+
+  return { 
+    user, 
+    session,
+    loading, 
+    signIn, 
+    signUp, 
+    signOut,
+    getAccessToken
+  };
 };
