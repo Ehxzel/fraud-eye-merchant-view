@@ -1,5 +1,62 @@
 
 import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
+import { Transaction, Alert, Metric, RiskDataPoint, TrendDataPoint } from "@/types";
+
+// Function to simulate WebSocket/SSE connection
+const createMockConnection = (callback: (data: any) => void) => {
+  // Initial connection delay
+  setTimeout(() => {
+    api.getTransactions().then(transactions => {
+      api.getAlerts().then(alerts => {
+        api.getMetrics().then(metrics => {
+          api.getRiskData().then(riskData => {
+            api.getTrendData().then(trendData => {
+              callback({
+                metrics,
+                transactions,
+                alerts,
+                riskData,
+                trendData
+              });
+            });
+          });
+        });
+      });
+    }).catch(error => {
+      console.error("Error fetching initial data:", error);
+      // Fallback to mock data
+      callback(mockData);
+    });
+    
+    // Simulate occasional updates
+    const interval = setInterval(() => {
+      // Update with slightly different data for metrics
+      api.getMetrics().then(metrics => {
+        const updatedMetrics = {
+          ...metrics,
+          riskScore: metrics.riskScore + (Math.random() * 2 - 1),
+          dailyTransactions: metrics.dailyTransactions + Math.floor(Math.random() * 10)
+        };
+        
+        // Random chance to add a new alert
+        if (Math.random() > 0.7) {
+          api.getAlerts().then(alerts => {
+            callback({ metrics: updatedMetrics, alerts });
+          });
+        } else {
+          callback({ metrics: updatedMetrics });
+        }
+      }).catch(error => {
+        console.error("Error updating data:", error);
+      });
+    }, 10000); // Update every 10 seconds
+    
+    return () => clearInterval(interval);
+  }, 1500); // Initial connection delay of 1.5 seconds
+  
+  return () => {}; // Cleanup function
+};
 
 // Mock data for demonstration purposes
 const mockData = {
@@ -20,7 +77,7 @@ const mockData = {
       amount: 126.99,
       date: "2025-04-21, 10:23 AM",
       riskScore: 12,
-      status: "approved"
+      status: "approved" as const
     },
     {
       id: "tx_8a7b39e0c1",
@@ -28,7 +85,7 @@ const mockData = {
       amount: 499.95,
       date: "2025-04-21, 09:45 AM",
       riskScore: 68,
-      status: "flagged"
+      status: "flagged" as const
     },
     {
       id: "tx_2e6f91d3a7",
@@ -36,7 +93,7 @@ const mockData = {
       amount: 1250.00,
       date: "2025-04-21, 09:12 AM",
       riskScore: 85,
-      status: "blocked"
+      status: "blocked" as const
     },
     {
       id: "tx_3c5d72e9b8",
@@ -44,7 +101,7 @@ const mockData = {
       amount: 75.50,
       date: "2025-04-21, 08:30 AM",
       riskScore: 5,
-      status: "approved"
+      status: "approved" as const
     },
     {
       id: "tx_6d1c48f2a5",
@@ -52,7 +109,7 @@ const mockData = {
       amount: 350.25,
       date: "2025-04-21, 08:05 AM",
       riskScore: 42,
-      status: "flagged"
+      status: "flagged" as const
     }
   ],
   alerts: [
@@ -60,19 +117,19 @@ const mockData = {
       id: "alert_1",
       message: "Multiple failed transaction attempts from same IP address",
       time: "10 minutes ago",
-      severity: "high"
+      severity: "high" as const
     },
     {
       id: "alert_2",
       message: "Unusual transaction pattern detected for customer David Chen",
       time: "35 minutes ago",
-      severity: "medium"
+      severity: "medium" as const
     },
     {
       id: "alert_3",
       message: "New device used for customer Sarah Johnson",
       time: "1 hour ago",
-      severity: "low"
+      severity: "low" as const
     }
   ],
   riskData: [
@@ -97,51 +154,22 @@ const mockData = {
   ]
 };
 
-// Function to simulate WebSocket/SSE connection
-const createMockConnection = (callback: (data: any) => void) => {
-  // Initial connection delay
-  setTimeout(() => {
-    callback(mockData);
-    
-    // Simulate occasional updates
-    const interval = setInterval(() => {
-      // Update with slightly different data
-      const updatedData = {
-        ...mockData,
-        metrics: {
-          ...mockData.metrics,
-          riskScore: mockData.metrics.riskScore + (Math.random() * 2 - 1),
-          dailyTransactions: mockData.metrics.dailyTransactions + Math.floor(Math.random() * 10)
-        },
-        alerts: Math.random() > 0.7 
-          ? [
-              {
-                id: `alert_${Date.now()}`,
-                message: "New suspicious activity detected",
-                time: "Just now",
-                severity: Math.random() > 0.5 ? "medium" : "low"
-              },
-              ...mockData.alerts.slice(0, 2)
-            ] 
-          : mockData.alerts
-      };
-      
-      callback(updatedData);
-    }, 10000); // Update every 10 seconds
-    
-    return () => clearInterval(interval);
-  }, 1500); // Initial connection delay of 1.5 seconds
-  
-  return () => {}; // Cleanup function
-};
-
 export const useDataProvider = () => {
-  const [data, setData] = useState<null | typeof mockData>(null);
+  const [data, setData] = useState<{
+    metrics: Metric;
+    transactions: Transaction[];
+    alerts: Alert[];
+    riskData: RiskDataPoint[];
+    trendData: TrendDataPoint[];
+  } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
     const cleanup = createMockConnection((newData) => {
-      setData(newData);
+      setData(prevData => ({
+        ...prevData,
+        ...newData
+      }));
       setIsLoading(false);
     });
     
@@ -150,10 +178,10 @@ export const useDataProvider = () => {
   
   return {
     metrics: data?.metrics || mockData.metrics,
-    transactions: data?.transactions || [],
-    alerts: data?.alerts || [],
-    riskData: data?.riskData || [],
-    trendData: data?.trendData || [],
+    transactions: data?.transactions || mockData.transactions,
+    alerts: data?.alerts || mockData.alerts,
+    riskData: data?.riskData || mockData.riskData,
+    trendData: data?.trendData || mockData.trendData,
     isLoading
   };
 };
