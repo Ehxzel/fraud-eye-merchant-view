@@ -1,23 +1,12 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Get Supabase URL and anon key from environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Supabase credentials
+const supabaseUrl = 'https://ouwyiehmxmvxxnzpdumb.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im91d3lpZWhteG12eHhuenBkdW1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxOTIzODYsImV4cCI6MjA2MTc2ODM4Nn0.-fqLvl-NHSPWOegsiQa916Le55a4Hk8N54LRsWyptDg';
 
-// Validate that the necessary environment variables are set
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables. Make sure to set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
-}
-
-// Create a mock client for development when credentials are missing
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Using mock Supabase client. Authentication features will not work.');
-}
-
-// Use a placeholder URL and key if not provided to prevent immediate errors
-// This allows the app to at least load, though auth features won't work
+// Create Supabase client
 export const supabase = createClient(
-  supabaseUrl || 'https://placeholder-project.supabase.co',
-  supabaseAnonKey || 'placeholder-anon-key'
+  supabaseUrl,
+  supabaseAnonKey
 );
