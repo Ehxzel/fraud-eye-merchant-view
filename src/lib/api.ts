@@ -1,7 +1,6 @@
-
 import { supabase } from './supabase';
 
-// Placeholder for the Arya API key
+// Placeholder for the Arya API key - will be replaced with environment variable in production
 const ARYA_API_KEY = import.meta.env.VITE_ARYA_API_KEY || 'your-arya-ai-key';
 
 export const api = {
