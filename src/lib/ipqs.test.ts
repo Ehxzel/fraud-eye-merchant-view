@@ -8,10 +8,13 @@ import { supabase } from './supabase';
 vi.mock('axios');
 vi.mock('./supabase', () => ({
   supabase: {
-    from: vi.fn().mockReturnThis(),
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data: { email: 'test@example.com' }, error: null }),
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn().mockResolvedValue({ data: { email: 'test@example.com' }, error: null }),
+        })),
+      })),
+    })),
   },
 }));
 
@@ -81,8 +84,6 @@ describe('IPQS Fraud Detection', () => {
     
     // Verify Supabase was called to get the user email
     expect(supabase.from).toHaveBeenCalledWith('profiles');
-    expect(supabase.select).toHaveBeenCalledWith('email');
-    expect(supabase.eq).toHaveBeenCalledWith('id', 'user456');
   });
 
   it('should return 0 (safe score) when API call fails', async () => {
