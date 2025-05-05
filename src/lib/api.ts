@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { checkFraud } from './ipqs';
+import { checkFraud, FraudCheckParams } from './ipqs';
 
 // Helper function to get the current auth token
 const getAuthToken = () => {
@@ -47,13 +47,16 @@ export const api = {
     // For now using a placeholder as we can't easily get client IP in the browser
     const userIp = '192.168.1.1';
     
-    // Call IPQS API for fraud detection with improved data
-    const fraudScore = await checkFraud({
+    // Prepare fraud check params with all available data
+    const fraudCheckParams: FraudCheckParams = {
       ...data,
       timestamp: new Date(data.timestamp),
       userEmail: user.email,
       userIp
-    });
+    };
+    
+    // Call IPQS API for fraud detection with improved data
+    const fraudScore = await checkFraud(fraudCheckParams);
     
     await supabase
       .from('transactions')
