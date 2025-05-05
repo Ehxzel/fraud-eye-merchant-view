@@ -1,20 +1,41 @@
 
 import axios from 'axios';
+import { supabase } from './supabase';
 
 // Placeholder for the IPQS API key - will be replaced with environment variable in production
 const IPQS_API_KEY = import.meta.env.VITE_IPQS_API_KEY || 'kCf70i2q5Zp4Oo6jq2wqzu5xyoq3dUFx';
 const IPQS_API_URL = `https://www.ipqualityscore.com/api/json/report/${IPQS_API_KEY}`;
+
+interface FraudCheckParams {
+  amount: number;
+  timestamp: Date;
+  user_id: string;
+  id?: string;
+  userEmail?: string;
+  userIp?: string;
+}
 
 /**
  * Sends transaction data to IPQualityScore Fraud Detection API for fraud detection.
  * @param transaction - Transaction details (e.g., { amount, timestamp, user_id }).
  * @returns Fraud score (0 to 1, where higher means more likely fraud).
  */
-export const checkFraud = async (transaction: any) => {
+export const checkFraud = async (transaction: FraudCheckParams) => {
   try {
-    // Placeholder user data (replace with actual data from Supabase or request)
-    const userEmail = `user-${transaction.user_id}@fraudeye.com`;
-    const userIp = '192.168.1.1'; // Replace with req.ip or x-forwarded-for
+    // Get user email from Supabase if not provided
+    let userEmail = transaction.userEmail;
+    if (!userEmail) {
+      const { data: user } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', transaction.user_id)
+        .single();
+      
+      userEmail = user?.email || `user-${transaction.user_id}@fraudeye.com`;
+    }
+
+    // Use provided IP or fallback to placeholder
+    const userIp = transaction.userIp || '192.168.1.1';
 
     const response = await axios.post(
       IPQS_API_URL,

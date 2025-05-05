@@ -1,8 +1,6 @@
+
 import { supabase } from './supabase';
 import { checkFraud } from './ipqs';
-
-// Placeholder for the Arya API key - will be replaced with environment variable in production
-const ARYA_API_KEY = import.meta.env.VITE_ARYA_API_KEY || 'your-arya-ai-key';
 
 // Helper function to get the current auth token
 const getAuthToken = () => {
@@ -45,10 +43,16 @@ export const api = {
     
     if (error) throw error;
     
-    // Call IPQS API for fraud detection
+    // Get user's IP address (in a real app, this would be captured from the client)
+    // For now using a placeholder as we can't easily get client IP in the browser
+    const userIp = '192.168.1.1';
+    
+    // Call IPQS API for fraud detection with improved data
     const fraudScore = await checkFraud({
       ...data,
-      timestamp: new Date(data.timestamp)
+      timestamp: new Date(data.timestamp),
+      userEmail: user.email,
+      userIp
     });
     
     await supabase
