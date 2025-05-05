@@ -41,6 +41,11 @@ interface IPQSResponse {
  * @returns Fraud score (0 to 1, where higher means more likely fraud).
  */
 export const checkFraud = async (transaction: FraudCheckParams): Promise<number> => {
+  // Simple rule: If amount > 1000, return high fraud score (0.9), otherwise return low score (0.2)
+  return transaction.amount > 1000 ? 0.9 : 0.2;
+
+  // Comment out the original IPQS implementation since we're using the simple rule above
+  /*
   try {
     // Get user email from Supabase if not provided
     let userEmail = transaction.userEmail;
@@ -116,4 +121,5 @@ export const checkFraud = async (transaction: FraudCheckParams): Promise<number>
     console.error(`IPQS API error: ${error instanceof Error ? error.message : String(error)}`);
     return 0; // Fallback to safe score
   }
+  */
 };
