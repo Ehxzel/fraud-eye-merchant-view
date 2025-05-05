@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { checkFraud } from './ipqs';
 
 // Placeholder for the Arya API key - will be replaced with environment variable in production
 const ARYA_API_KEY = import.meta.env.VITE_ARYA_API_KEY || 'your-arya-ai-key';
@@ -44,11 +45,11 @@ export const api = {
     
     if (error) throw error;
     
-    // In a real app, this would be replaced with an actual call to the Arya AI API
-    console.log(`Would call Arya AI with API key: ${ARYA_API_KEY}`);
-    
-    // Simulate fraud score calculation
-    const fraudScore = Math.random();
+    // Call IPQS API for fraud detection
+    const fraudScore = await checkFraud({
+      ...data,
+      timestamp: new Date(data.timestamp)
+    });
     
     await supabase
       .from('transactions')
