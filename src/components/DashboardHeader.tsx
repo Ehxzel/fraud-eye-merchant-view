@@ -3,7 +3,7 @@ import React from "react";
 import { Bell, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
 const DashboardHeader = () => {
@@ -26,9 +26,12 @@ const DashboardHeader = () => {
   return (
     <header className="bg-white border-b border-slate-200 py-4 px-6">
       <div className="container mx-auto flex justify-between items-center">
-        <div className="flex items-center">
+        <div className="flex items-center gap-6">
           <div className="font-bold text-xl text-teal-600 mr-2">FraudEye</div>
           <span className="text-sm text-slate-500">Merchant Dashboard</span>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/manual-fraud-check">Manual Fraud Check</Link>
+          </Button>
         </div>
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon">
