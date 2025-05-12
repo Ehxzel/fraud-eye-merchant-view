@@ -1,5 +1,7 @@
+
 import axios from 'axios';
 import { supabase } from './supabase'; // Fixed import path
+import { Tables } from './database.types';
 
 // Placeholder for the IPQS API key - will be replaced with environment variable in production
 const IPQS_API_KEY = import.meta.env.VITE_IPQS_API_KEY || 'kCf70i2q5Zp4Oo6jq2wqzu5xyoq3dUFx';
@@ -45,11 +47,12 @@ export const checkFraud = async (transaction: FraudCheckParams): Promise<number>
     let userEmail = transaction.userEmail;
     if (!userEmail) {
       try {
+        // Type assertion to help TypeScript understand the structure
         const { data: user, error } = await supabase
           .from('profiles')
           .select('email')
           .eq('id', transaction.user_id)
-          .single();
+          .single() as { data: Tables['profiles'] | null, error: any };
         
         if (error) {
           console.error(`Failed to fetch user email: ${error.message}`);

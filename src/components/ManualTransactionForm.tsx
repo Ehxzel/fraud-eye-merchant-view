@@ -12,6 +12,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { FraudCheckParams } from '@/lib/ipqs';
+import { Tables, isNotNull } from '@/lib/database.types';
 import { Info, CircleX, Check } from 'lucide-react';
 
 // Form schema with validation
@@ -43,6 +44,12 @@ interface FraudResult {
   vpn?: boolean;
   tor?: boolean;
 }
+
+// Helper type for Supabase responses
+type SupabaseResponse<T> = {
+  data: T | null;
+  error: any;
+};
 
 const ManualTransactionForm = () => {
   const { user } = useAuth();
@@ -116,7 +123,7 @@ const ManualTransactionForm = () => {
         tor: fraudScore > 0.8,   // Simulated data
       });
 
-      // Store the transaction in Supabase
+      // Store the transaction in Supabase with type casting to help TypeScript
       const { data: transaction, error } = await supabase
         .from('transactions')
         .insert({
@@ -126,7 +133,7 @@ const ManualTransactionForm = () => {
           status: fraudScore > 0.8 ? 'blocked' : fraudScore > 0.5 ? 'flagged' : 'approved'
         })
         .select()
-        .single();
+        .single() as SupabaseResponse<Tables['transactions']>;
 
       if (error) {
         console.error("Failed to store transaction:", error);
@@ -135,6 +142,11 @@ const ManualTransactionForm = () => {
           description: "Failed to store transaction result",
           variant: "destructive",
         });
+        return;
+      }
+
+      if (!transaction) {
+        console.error("No transaction data returned");
         return;
       }
 

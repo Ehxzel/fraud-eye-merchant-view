@@ -1,10 +1,17 @@
 
 import { supabase } from './supabase'; // Fixed import path
 import { checkFraud, FraudCheckParams } from './ipqs';
+import { Tables, isNotNull } from './database.types';
 
 // Helper function to get the current auth token
 const getAuthToken = () => {
   return localStorage.getItem('supabase_access_token');
+};
+
+// Helper type for Supabase responses
+type SupabaseResponse<T> = {
+  data: T | null;
+  error: any;
 };
 
 export const api = {
@@ -13,16 +20,17 @@ export const api = {
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
-      .order('timestamp', { ascending: false });
+      .order('timestamp', { ascending: false }) as SupabaseResponse<Tables['transactions'][]>;
     
     if (error) throw error;
+    if (!data) return [];
     
-    return data.map((transaction: any) => ({
+    return data.map((transaction: Tables['transactions']) => ({
       id: `tx_${transaction.id}`,
       customer: transaction.user_id, // This would be replaced with actual customer name in a real app
       amount: transaction.amount,
       date: new Date(transaction.timestamp).toLocaleString(),
-      riskScore: transaction.fraud_score * 100 || 0,
+      riskScore: (transaction.fraud_score || 0) * 100,
       status: transaction.status === 'approved' 
         ? 'approved' 
         : transaction.status === 'blocked' 
@@ -39,9 +47,10 @@ export const api = {
       .from('transactions')
       .insert({ user_id: user.id, amount })
       .select()
-      .single();
+      .single() as SupabaseResponse<Tables['transactions']>;
     
     if (error) throw error;
+    if (!data) throw new Error('Failed to create transaction');
     
     // Get user's IP address (in a real app, this would be captured from the client)
     // For now using a placeholder as we can't easily get client IP in the browser
@@ -49,8 +58,10 @@ export const api = {
     
     // Prepare fraud check params with all available data
     const fraudCheckParams: FraudCheckParams = {
-      ...data,
+      amount: data.amount,
       timestamp: new Date(data.timestamp),
+      user_id: data.user_id,
+      id: data.id,
       userEmail: user.email,
       userIp
     };
@@ -83,9 +94,10 @@ export const api = {
         *,
         transaction:transactions(*)
       `)
-      .order('timestamp', { ascending: false });
+      .order('timestamp', { ascending: false }) as SupabaseResponse<any[]>;
     
     if (error) throw error;
+    if (!data) return [];
     
     return data.map((alert: any) => ({
       id: `alert_${alert.id}`,
