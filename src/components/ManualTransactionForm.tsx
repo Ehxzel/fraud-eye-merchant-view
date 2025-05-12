@@ -12,7 +12,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { FraudCheckParams } from '@/lib/ipqs';
-import { Tables, isNotNull } from '@/lib/database.types';
+import { Tables, PostgrestResponse } from '@/lib/database.types';
 import { Info, CircleX, Check } from 'lucide-react';
 
 // Form schema with validation
@@ -133,7 +133,7 @@ const ManualTransactionForm = () => {
           status: fraudScore > 0.8 ? 'blocked' : fraudScore > 0.5 ? 'flagged' : 'approved'
         })
         .select()
-        .single() as SupabaseResponse<Tables['transactions']>;
+        .single() as PostgrestResponse<Tables['transactions']>;
 
       if (error) {
         console.error("Failed to store transaction:", error);
@@ -157,7 +157,7 @@ const ManualTransactionForm = () => {
           .insert({
             transaction_id: transaction.id,
             alert_type: `High Fraud Risk (Manual Check: ${(fraudScore * 100).toFixed(0)}%)`,
-          }) as { data: any, error: any };
+          }) as PostgrestResponse<null>;
       }
 
       toast({

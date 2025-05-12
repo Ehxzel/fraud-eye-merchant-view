@@ -1,7 +1,7 @@
 
 import axios from 'axios';
 import { supabase } from './supabase'; // Fixed import path
-import { Tables } from './database.types';
+import { Tables, PostgrestResponse } from './database.types';
 
 // Placeholder for the IPQS API key - will be replaced with environment variable in production
 const IPQS_API_KEY = import.meta.env.VITE_IPQS_API_KEY || 'kCf70i2q5Zp4Oo6jq2wqzu5xyoq3dUFx';
@@ -52,7 +52,7 @@ export const checkFraud = async (transaction: FraudCheckParams): Promise<number>
           .from('profiles')
           .select('email')
           .eq('id', transaction.user_id)
-          .single() as { data: Tables['profiles'] | null, error: any };
+          .single() as PostgrestResponse<Tables['profiles']>;
         
         if (error) {
           console.error(`Failed to fetch user email: ${error.message}`);

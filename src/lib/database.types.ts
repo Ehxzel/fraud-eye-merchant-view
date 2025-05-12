@@ -25,3 +25,9 @@ export type Tables = {
 export function isNotNull<T>(value: T | null): value is T {
   return value !== null;
 }
+
+// Helper type for Supabase responses
+export type PostgrestResponse<T> = {
+  data: T | null;
+  error: any;
+};

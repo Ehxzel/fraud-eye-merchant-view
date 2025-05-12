@@ -9,7 +9,77 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      fraud_alerts: {
+        Row: {
+          alert_type: string
+          id: string
+          timestamp: string
+          transaction_id: string | null
+        }
+        Insert: {
+          alert_type: string
+          id?: string
+          timestamp?: string
+          transaction_id?: string | null
+        }
+        Update: {
+          alert_type?: string
+          id?: string
+          timestamp?: string
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fraud_alerts_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          email: string | null
+          id: string
+        }
+        Insert: {
+          email?: string | null
+          id: string
+        }
+        Update: {
+          email?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          fraud_score: number | null
+          id: string
+          status: string
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          fraud_score?: number | null
+          id?: string
+          status?: string
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          fraud_score?: number | null
+          id?: string
+          status?: string
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

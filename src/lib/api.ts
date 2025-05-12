@@ -1,17 +1,10 @@
-
 import { supabase } from './supabase'; // Fixed import path
 import { checkFraud, FraudCheckParams } from './ipqs';
-import { Tables, isNotNull } from './database.types';
+import { Tables, isNotNull, PostgrestResponse } from './database.types';
 
 // Helper function to get the current auth token
 const getAuthToken = () => {
   return localStorage.getItem('supabase_access_token');
-};
-
-// Helper type for Supabase responses
-type SupabaseResponse<T> = {
-  data: T | null;
-  error: any;
 };
 
 export const api = {
@@ -20,7 +13,7 @@ export const api = {
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
-      .order('timestamp', { ascending: false }) as SupabaseResponse<Tables['transactions'][]>;
+      .order('timestamp', { ascending: false }) as PostgrestResponse<Tables['transactions'][]>;
     
     if (error) throw error;
     if (!data) return [];
@@ -47,7 +40,7 @@ export const api = {
       .from('transactions')
       .insert({ user_id: user.id, amount })
       .select()
-      .single() as SupabaseResponse<Tables['transactions']>;
+      .single() as PostgrestResponse<Tables['transactions']>;
     
     if (error) throw error;
     if (!data) throw new Error('Failed to create transaction');
@@ -72,7 +65,7 @@ export const api = {
     await supabase
       .from('transactions')
       .update({ fraud_score: fraudScore })
-      .eq('id', data.id) as { data: any, error: any };
+      .eq('id', data.id) as PostgrestResponse<null>;
     
     if (fraudScore > 0.8) {
       await supabase
@@ -80,7 +73,7 @@ export const api = {
         .insert({ 
           transaction_id: data.id, 
           alert_type: 'High Fraud Risk' 
-        }) as { data: any, error: any };
+        }) as PostgrestResponse<null>;
     }
     
     return data;
@@ -94,7 +87,7 @@ export const api = {
         *,
         transaction:transactions(*)
       `)
-      .order('timestamp', { ascending: false }) as SupabaseResponse<any[]>;
+      .order('timestamp', { ascending: false }) as PostgrestResponse<any[]>;
     
     if (error) throw error;
     if (!data) return [];
