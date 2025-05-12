@@ -45,17 +45,22 @@ export const checkFraud = async (transaction: FraudCheckParams): Promise<number>
     // Get user email from Supabase if not provided
     let userEmail = transaction.userEmail;
     if (!userEmail) {
-      const { data: user, error } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('id', transaction.user_id)
-        .single();
-      
-      if (error) {
-        console.error(`Failed to fetch user email: ${error.message}`);
+      try {
+        const { data: user, error } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', transaction.user_id)
+          .single();
+        
+        if (error) {
+          console.error(`Failed to fetch user email: ${error.message}`);
+        }
+        
+        userEmail = user?.email || `user-${transaction.user_id}@fraudeye.com`;
+      } catch (e) {
+        console.error('Error fetching user data:', e);
+        userEmail = `user-${transaction.user_id}@fraudeye.com`;
       }
-      
-      userEmail = user?.email || `user-${transaction.user_id}@fraudeye.com`;
     }
 
     // Use provided IP or fallback to placeholder
