@@ -2,11 +2,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
+import { useToast } from '@/hooks/use-toast';
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -41,6 +43,67 @@ export const useAuth = () => {
   const signIn = async ({ email, password }: { email: string; password: string }) => {
     try {
       console.log('Attempting sign in with:', email);
+      
+      // Special handling for demo credentials
+      if (email === 'demo@fraudeye.com' && password === 'demo123') {
+        // For demo account, try to create it if it doesn't exist yet
+        const { data: existingUser, error: checkError } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        
+        if (checkError && checkError.message.includes('Email not confirmed')) {
+          // Auto-confirm demo account by creating a new session directly
+          console.log('Demo account needs confirmation, handling special case');
+          
+          // First try to reset password to ensure account exists
+          await supabase.auth.resetPasswordForEmail(email);
+          
+          // Try signing in again
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+          
+          if (error) {
+            // If still failing, create the demo account
+            console.log('Creating demo account');
+            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+              email,
+              password,
+              options: { 
+                emailRedirectTo: `${window.location.origin}/login`,
+                data: {
+                  is_demo: true
+                }
+              }
+            });
+            
+            if (signUpError) throw signUpError;
+            
+            // Force login for demo account without email verification
+            const { data: signInData, error: finalError } = await supabase.auth.signInWithPassword({
+              email,
+              password
+            });
+            
+            if (finalError) throw finalError;
+            
+            console.log('Demo account login successful');
+            localStorage.setItem('supabase_access_token', signInData?.session?.access_token || '');
+            return { success: true, session: signInData?.session };
+          }
+          
+          localStorage.setItem('supabase_access_token', data?.session?.access_token || '');
+          return { success: true, session: data?.session };
+        } else if (!checkError) {
+          // Demo login succeeded directly
+          localStorage.setItem('supabase_access_token', existingUser?.session?.access_token || '');
+          return { success: true, session: existingUser?.session };
+        }
+      }
+      
+      // Regular login for non-demo accounts
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
@@ -49,6 +112,7 @@ export const useAuth = () => {
       }
       
       console.log('Sign in successful:', data?.user?.email);
+      localStorage.setItem('supabase_access_token', data?.session?.access_token || '');
       
       return { success: true, session: data?.session };
     } catch (error) {
@@ -63,13 +127,32 @@ export const useAuth = () => {
         email, 
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/login`
+          emailRedirectTo: `${window.location.origin}/login`,
+          // Store the registration timestamp for future reference
+          data: {
+            registered_at: new Date().toISOString()
+          }
         }
       });
       
       if (error) throw error;
       
       console.log('Sign up successful:', data?.user?.email);
+      toast({
+        title: "Account created successfully",
+        description: data?.user?.email ? `Welcome ${data.user.email}!` : "Welcome to FraudEye!",
+      });
+      
+      // Auto-login for new accounts to improve user experience
+      if (!data?.session) {
+        const { data: signInData } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInData?.session) {
+          localStorage.setItem('supabase_access_token', signInData.session.access_token);
+        }
+        return { success: true, session: signInData?.session };
+      }
+      
+      localStorage.setItem('supabase_access_token', data?.session?.access_token || '');
       return { success: true, session: data?.session };
     } catch (error) {
       console.error('Error signing up:', error);

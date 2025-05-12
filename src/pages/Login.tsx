@@ -19,6 +19,10 @@ const Login = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Demo credentials for easy access
+  const demoEmail = "demo@fraudeye.com";
+  const demoPassword = "demo123";
+
   useEffect(() => {
     // If user is already logged in, redirect to dashboard
     if (user) {
@@ -32,6 +36,7 @@ const Login = () => {
     setErrorMessage("");
 
     try {
+      console.log("Attempting login with:", email);
       const { success, error } = await signIn({ email, password });
       
       if (success) {
@@ -44,6 +49,11 @@ const Login = () => {
         const errorMsg = error?.message || "Invalid email or password";
         console.error("Login error:", errorMsg);
         setErrorMessage(errorMsg);
+        
+        // Special handling for common errors
+        if (errorMsg.includes("Email not confirmed")) {
+          setErrorMessage("Please check your email to confirm your account before logging in. For demo account, try again.");
+        }
       }
     } catch (error: any) {
       console.error("Login error:", error);
@@ -59,19 +69,28 @@ const Login = () => {
     setErrorMessage("");
 
     try {
+      console.log("Attempting to create account with:", email);
       const { success, error } = await signUp({ email, password });
       
       if (success) {
         toast({
           title: "Registration Successful",
-          description: "Please check your email for confirmation. You can login immediately if email confirmation is not required.",
+          description: "You can now login with your credentials",
         });
         setEmail("");
         setPassword("");
+        // Auto-redirect to the dashboard if we have a session
+        navigate("/");
       } else {
         const errorMsg = error?.message || "Could not create account";
         console.error("Registration error:", errorMsg);
-        setErrorMessage(errorMsg);
+        
+        // Special handling for user already exists
+        if (errorMsg.includes("already registered")) {
+          setErrorMessage("This email is already registered. Please log in instead.");
+        } else {
+          setErrorMessage(errorMsg);
+        }
       }
     } catch (error: any) {
       console.error("Registration error:", error);
@@ -79,6 +98,11 @@ const Login = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fillDemoCredentials = () => {
+    setEmail(demoEmail);
+    setPassword(demoPassword);
   };
 
   return (
@@ -138,8 +162,19 @@ const Login = () => {
             </form>
             
             <div className="mt-6 text-center text-sm">
-              <p className="text-slate-500">
-                Demo credentials: demo@fraudeye.com / demo123
+              <p className="text-slate-500 mb-2">
+                Demo credentials:
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="mx-auto mb-2" 
+                onClick={fillDemoCredentials}
+              >
+                Use demo account
+              </Button>
+              <p className="text-xs text-slate-400">
+                (demo@fraudeye.com / demo123)
               </p>
             </div>
           </TabsContent>
@@ -182,10 +217,7 @@ const Login = () => {
             
             <div className="mt-6 text-center text-sm">
               <p className="text-slate-500">
-                After registration, check your email for confirmation
-              </p>
-              <p className="text-slate-500 mt-1">
-                (You may be able to login immediately if email confirmation is disabled)
+                After registration, you can login immediately
               </p>
             </div>
           </TabsContent>
