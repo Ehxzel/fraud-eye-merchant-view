@@ -157,7 +157,7 @@ const ManualTransactionForm = () => {
           .insert({
             transaction_id: transaction.id,
             alert_type: `High Fraud Risk (Manual Check: ${(fraudScore * 100).toFixed(0)}%)`,
-          });
+          }) as { data: any, error: any };
       }
 
       toast({

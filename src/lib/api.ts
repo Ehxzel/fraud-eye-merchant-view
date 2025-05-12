@@ -72,7 +72,7 @@ export const api = {
     await supabase
       .from('transactions')
       .update({ fraud_score: fraudScore })
-      .eq('id', data.id);
+      .eq('id', data.id) as { data: any, error: any };
     
     if (fraudScore > 0.8) {
       await supabase
@@ -80,7 +80,7 @@ export const api = {
         .insert({ 
           transaction_id: data.id, 
           alert_type: 'High Fraud Risk' 
-        });
+        }) as { data: any, error: any };
     }
     
     return data;
