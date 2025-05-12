@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import ManualFraudCheck from "./pages/ManualFraudCheck";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,14 @@ const App = () => (
             element={
               <ProtectedRoute>
                 <Index />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/manual-fraud-check" 
+            element={
+              <ProtectedRoute>
+                <ManualFraudCheck />
               </ProtectedRoute>
             } 
           />
