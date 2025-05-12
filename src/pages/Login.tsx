@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -7,18 +7,29 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const [errorMessage, setErrorMessage] = useState("");
+  const { user, signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    // If user is already logged in, redirect to dashboard
+    if (user) {
+      navigate("/");
+    }
+  }, [user, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMessage("");
 
     try {
       const { success, error } = await signIn({ email, password });
@@ -30,15 +41,13 @@ const Login = () => {
         });
         navigate("/");
       } else {
-        throw error;
+        const errorMsg = error?.message || "Invalid email or password";
+        console.error("Login error:", errorMsg);
+        setErrorMessage(errorMsg);
       }
     } catch (error: any) {
       console.error("Login error:", error);
-      toast({
-        title: "Login Failed",
-        description: error?.message || "Invalid email or password",
-        variant: "destructive",
-      });
+      setErrorMessage(error?.message || "Invalid email or password");
     } finally {
       setLoading(false);
     }
@@ -47,6 +56,7 @@ const Login = () => {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMessage("");
 
     try {
       const { success, error } = await signUp({ email, password });
@@ -59,15 +69,13 @@ const Login = () => {
         setEmail("");
         setPassword("");
       } else {
-        throw error;
+        const errorMsg = error?.message || "Could not create account";
+        console.error("Registration error:", errorMsg);
+        setErrorMessage(errorMsg);
       }
     } catch (error: any) {
       console.error("Registration error:", error);
-      toast({
-        title: "Registration Failed",
-        description: error?.message || "Could not create account",
-        variant: "destructive",
-      });
+      setErrorMessage(error?.message || "Could not create account");
     } finally {
       setLoading(false);
     }
@@ -80,6 +88,13 @@ const Login = () => {
           <h1 className="text-3xl font-bold text-teal-600">FraudEye</h1>
           <p className="text-slate-500 mt-2">Merchant Dashboard</p>
         </div>
+
+        {errorMessage && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        )}
 
         <Tabs defaultValue="login" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">

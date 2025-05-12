@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 
 export const useAuth = () => {
@@ -9,27 +9,29 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get current session and user
-    const getInitialSession = async () => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email);
+      setSession(session);
+      setUser(session?.user ?? null);
+    });
+
+    // THEN check for existing session
+    const initializeAuth = async () => {
       try {
         setLoading(true);
         const { data: { session } } = await supabase.auth.getSession();
+        console.log('Initial session check:', session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
       } catch (error) {
-        console.error('Error getting session:', error);
+        console.error('Error getting initial session:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    getInitialSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-    });
+    initializeAuth();
 
     return () => {
       subscription.unsubscribe();
@@ -38,14 +40,15 @@ export const useAuth = () => {
 
   const signIn = async ({ email, password }: { email: string; password: string }) => {
     try {
+      console.log('Attempting sign in with:', email);
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
-      if (error) throw error;
-      
-      // Store access token in localStorage for API calls
-      if (data?.session?.access_token) {
-        localStorage.setItem('supabase_access_token', data.session.access_token);
+      if (error) {
+        console.error('Sign in error:', error.message);
+        throw error;
       }
+      
+      console.log('Sign in successful:', data?.user?.email);
       
       return { success: true, session: data?.session };
     } catch (error) {
@@ -65,6 +68,8 @@ export const useAuth = () => {
       });
       
       if (error) throw error;
+      
+      console.log('Sign up successful:', data?.user?.email);
       return { success: true, session: data?.session };
     } catch (error) {
       console.error('Error signing up:', error);
@@ -79,6 +84,8 @@ export const useAuth = () => {
       
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      
+      console.log('Sign out successful');
       return { success: true };
     } catch (error) {
       console.error('Error signing out:', error);
