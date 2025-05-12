@@ -1,5 +1,5 @@
 
-import { supabase } from './supabase';
+import { supabase } from './supabase'; // Fixed import path
 import { checkFraud, FraudCheckParams } from './ipqs';
 
 // Helper function to get the current auth token

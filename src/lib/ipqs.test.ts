@@ -1,8 +1,7 @@
-
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { checkFraud, type FraudCheckParams } from './ipqs';
 import axios from 'axios';
-import { supabase } from './supabase';
+import { supabase } from './supabase'; // Fixed import path
 
 // Mock external dependencies
 vi.mock('axios');

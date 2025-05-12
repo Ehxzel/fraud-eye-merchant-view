@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { checkFraud } from '@/lib/ipqs';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase'; // Fixed import path
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

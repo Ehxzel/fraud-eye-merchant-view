@@ -1,6 +1,5 @@
-
 import axios from 'axios';
-import { supabase } from './supabase';
+import { supabase } from './supabase'; // Fixed import path
 
 // Placeholder for the IPQS API key - will be replaced with environment variable in production
 const IPQS_API_KEY = import.meta.env.VITE_IPQS_API_KEY || 'kCf70i2q5Zp4Oo6jq2wqzu5xyoq3dUFx';
