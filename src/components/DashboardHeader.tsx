@@ -1,27 +1,11 @@
 
 import React from "react";
-import { Bell, Settings, LogOut } from "lucide-react";
+import { Bell, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/useAuth";
-import { useNavigate, Link } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
 
 const DashboardHeader = () => {
-  const { user, signOut } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-
-  const handleSignOut = async () => {
-    const { success } = await signOut();
-    if (success) {
-      toast({
-        title: "Logged out successfully",
-      });
-      navigate("/login");
-    }
-  };
-
-  const userInitial = user?.email?.charAt(0).toUpperCase() || "M";
+  const userInitial = "M"; // Default initial for Merchant
 
   return (
     <header className="bg-white border-b border-slate-200 py-4 px-6">
@@ -47,15 +31,9 @@ const DashboardHeader = () => {
               {userInitial}
             </div>
             <span className="text-sm font-medium">
-              {user?.email || "Merchant Account"}
+              Merchant Account
             </span>
           </div>
-          {user && (
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          )}
         </div>
       </div>
     </header>

@@ -1,21 +1,10 @@
 
-import { useAuth } from '@/hooks/useAuth';
-import { Navigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import ManualTransactionForm from '@/components/ManualTransactionForm';
 import { Button } from '@/components/ui/button';
 import { Home } from 'lucide-react';
 
 const ManualFraudCheck = () => {
-  const { user, loading } = useAuth();
-  
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
-  }
-  
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-  
   return (
     <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
