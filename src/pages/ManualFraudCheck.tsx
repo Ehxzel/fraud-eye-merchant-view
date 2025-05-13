@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import ManualTransactionForm from '@/components/ManualTransactionForm';
 import { Button } from '@/components/ui/button';
 import { Home } from 'lucide-react';
+import { Toaster } from '@/components/ui/toaster';
 
 const ManualFraudCheck = () => {
   return (
@@ -17,6 +18,7 @@ const ManualFraudCheck = () => {
         </Button>
       </div>
       <ManualTransactionForm />
+      <Toaster />
     </div>
   );
 };
