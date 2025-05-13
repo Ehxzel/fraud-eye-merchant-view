@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { checkFraud } from '@/lib/ipqs';
-import { supabase } from '@/lib/supabase'; // Fixed import path
+import { supabase } from '@/integrations/supabase/client'; // Fixed import path
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -88,6 +87,8 @@ const ManualTransactionForm = () => {
     setResult(null);
 
     try {
+      console.log("Starting fraud check with user ID:", user.id);
+      
       // Prepare parameters for fraud check
       const params: FraudCheckParams = {
         amount: Number(data.amount),
@@ -121,6 +122,14 @@ const ManualTransactionForm = () => {
         proxy: fraudScore > 0.5, // Simulated data - in real implementation would come from API
         vpn: fraudScore > 0.7,   // Simulated data
         tor: fraudScore > 0.8,   // Simulated data
+      });
+
+      console.log("Inserting transaction with user ID:", user.id);
+      console.log("Transaction data:", {
+        user_id: user.id,
+        amount: Number(data.amount),
+        fraud_score: fraudScore,
+        status: fraudScore > 0.8 ? 'blocked' : fraudScore > 0.5 ? 'flagged' : 'approved'
       });
 
       // Store the transaction in Supabase with type casting to help TypeScript
@@ -378,7 +387,10 @@ const ManualTransactionForm = () => {
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={resetForm}
+                  onClick={() => {
+                    form.reset();
+                    setResult(null);
+                  }}
                   disabled={isLoading}
                 >
                   Reset
