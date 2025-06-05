@@ -16,6 +16,18 @@ export interface FraudCheckRequest {
   user_id?: string;
 }
 
+export interface PhoneValidation {
+  valid: boolean;
+  fraud_score: number;
+  recent_abuse: boolean;
+  VOIP: boolean;
+  prepaid: boolean;
+  risky: boolean;
+  country: string;
+  carrier: string;
+  line_type: string;
+}
+
 export interface FraudCheckResponse {
   success: boolean;
   fraud_score: number;
@@ -32,6 +44,7 @@ export interface FraudCheckResponse {
   risk_factors: string[];
   connection_type: string;
   isp: string;
+  phone_validation?: PhoneValidation | null;
   error?: string;
 }
 
@@ -75,6 +88,7 @@ export const checkFraudWithEdgeFunction = async (params: FraudCheckRequest): Pro
       risk_factors: ['Service unavailable'],
       connection_type: 'Unknown',
       isp: 'Unknown',
+      phone_validation: null,
       error: error instanceof Error ? error.message : 'Unknown error'
     };
   }

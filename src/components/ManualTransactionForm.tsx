@@ -176,7 +176,7 @@ const ManualTransactionForm = () => {
         <CardHeader>
           <CardTitle>Manual Fraud Check</CardTitle>
           <CardDescription>
-            Enter transaction details to analyze potential fraud risk using real-time IP analysis
+            Enter transaction details to analyze potential fraud risk using real-time IP and phone number analysis
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -430,6 +430,60 @@ const ManualTransactionForm = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Phone Validation Results */}
+                {result.phone_validation && (
+                  <div className="mt-4 pt-3 border-t">
+                    <h4 className="font-medium mb-2 flex items-center">
+                      <Info className="h-4 w-4 mr-1" />
+                      Phone Validation Results:
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span>Valid:</span>
+                          {result.phone_validation.valid ? (
+                            <Check className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <CircleX className="h-4 w-4 text-red-500" />
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>VOIP:</span>
+                          {result.phone_validation.VOIP ? (
+                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                          ) : (
+                            <Check className="h-4 w-4 text-green-500" />
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Prepaid:</span>
+                          {result.phone_validation.prepaid ? (
+                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                          ) : (
+                            <Check className="h-4 w-4 text-green-500" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span>Fraud Score:</span>
+                          <span className={getRiskColor(result.phone_validation.fraud_score / 100)}>
+                            {result.phone_validation.fraud_score}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Carrier:</span>
+                          <span>{result.phone_validation.carrier}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Line Type:</span>
+                          <span>{result.phone_validation.line_type}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 {result.risk_factors.length > 0 && (
                   <div className="mt-4 pt-3 border-t">

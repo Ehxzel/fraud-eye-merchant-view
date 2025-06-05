@@ -82,6 +82,22 @@ serve(async (req) => {
 
     console.log('IPQS IP Response:', ipData);
 
+    // Initialize phone validation data
+    let phoneData = null;
+    
+    // Call IPQS Phone Validation API if phone number is provided
+    if (phone && phone.trim() !== '') {
+      try {
+        const phoneUrl = `https://ipqualityscore.com/api/json/phone/${IPQS_API_KEY}/${encodeURIComponent(phone)}`;
+        const phoneResponse = await fetch(phoneUrl);
+        phoneData = await phoneResponse.json();
+        console.log('IPQS Phone Response:', phoneData);
+      } catch (phoneError) {
+        console.error('Phone validation error:', phoneError);
+        // Continue with IP-only validation if phone validation fails
+      }
+    }
+
     // Calculate fraud score based on multiple factors
     let fraudScore = 0;
     let riskFactors = [];
@@ -90,7 +106,7 @@ serve(async (req) => {
       // Base fraud score from IPQS
       fraudScore = (ipData.fraud_score || 0) / 100;
       
-      // Additional risk factors
+      // Additional risk factors from IP analysis
       if (ipData.proxy) {
         fraudScore += 0.2;
         riskFactors.push('Proxy detected');
@@ -111,21 +127,63 @@ serve(async (req) => {
         fraudScore += 0.2;
         riskFactors.push('Recent abuse detected');
       }
-
-      // High-value transaction risk adjustment
-      if (amount > 1000) {
-        fraudScore += 0.1;
-        riskFactors.push('High value transaction');
-      }
-      if (amount > 5000) {
-        fraudScore += 0.1;
-        riskFactors.push('Very high value transaction');
-      }
     } else {
-      console.error('IPQS API error:', ipData.message);
-      // Use conservative fraud score if API fails
+      console.error('IPQS IP API error:', ipData.message);
+      // Use conservative fraud score if IP API fails
       fraudScore = 0.3;
-      riskFactors.push('API verification failed');
+      riskFactors.push('IP verification failed');
+    }
+
+    // Add phone validation risk factors
+    if (phoneData && phoneData.success) {
+      // Phone-specific risk factors
+      if (phoneData.fraud_score) {
+        const phoneRisk = phoneData.fraud_score / 100;
+        fraudScore += phoneRisk * 0.3; // Weight phone score at 30%
+        
+        if (phoneRisk > 0.5) {
+          riskFactors.push(`High-risk phone number (${phoneData.fraud_score}%)`);
+        }
+      }
+      
+      if (phoneData.VOIP) {
+        fraudScore += 0.1;
+        riskFactors.push('VOIP phone number');
+      }
+      
+      if (phoneData.recent_abuse) {
+        fraudScore += 0.15;
+        riskFactors.push('Phone number recent abuse');
+      }
+      
+      if (!phoneData.valid) {
+        fraudScore += 0.2;
+        riskFactors.push('Invalid phone number');
+      }
+      
+      if (phoneData.risky) {
+        fraudScore += 0.15;
+        riskFactors.push('Risky phone number');
+      }
+      
+      if (phoneData.prepaid) {
+        fraudScore += 0.05;
+        riskFactors.push('Prepaid phone number');
+      }
+    } else if (phone && phone.trim() !== '') {
+      // Phone was provided but validation failed
+      fraudScore += 0.1;
+      riskFactors.push('Phone validation failed');
+    }
+
+    // High-value transaction risk adjustment
+    if (amount > 1000) {
+      fraudScore += 0.1;
+      riskFactors.push('High value transaction');
+    }
+    if (amount > 5000) {
+      fraudScore += 0.1;
+      riskFactors.push('Very high value transaction');
     }
 
     // Normalize fraud score to 0-1 range
@@ -133,7 +191,7 @@ serve(async (req) => {
 
     console.log(`Final fraud score: ${fraudScore}, Risk factors: ${riskFactors.join(', ')}`);
 
-    // Return comprehensive fraud detection results
+    // Return comprehensive fraud detection results including phone data
     return new Response(
       JSON.stringify({
         success: true,
@@ -150,7 +208,18 @@ serve(async (req) => {
         recent_abuse: ipData.recent_abuse || false,
         risk_factors: riskFactors,
         connection_type: ipData.connection_type || 'Unknown',
-        isp: ipData.ISP || 'Unknown'
+        isp: ipData.ISP || 'Unknown',
+        phone_validation: phoneData ? {
+          valid: phoneData.valid || false,
+          fraud_score: phoneData.fraud_score || 0,
+          recent_abuse: phoneData.recent_abuse || false,
+          VOIP: phoneData.VOIP || false,
+          prepaid: phoneData.prepaid || false,
+          risky: phoneData.risky || false,
+          country: phoneData.country || 'Unknown',
+          carrier: phoneData.carrier || 'Unknown',
+          line_type: phoneData.line_type || 'Unknown'
+        } : null
       }),
       { 
         headers: { 
