@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { checkFraud } from '@/lib/ipqs';
-import { supabase } from '@/integrations/supabase/client'; // Fixed import path
+import { checkFraudWithEdgeFunction, FraudCheckRequest, FraudCheckResponse } from '@/lib/fraudService';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,9 +10,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { FraudCheckParams } from '@/lib/ipqs';
 import { Tables, PostgrestResponse } from '@/lib/database.types';
-import { Info, CircleX, Check } from 'lucide-react';
+import { Info, CircleX, Check, Globe, Shield, AlertTriangle } from 'lucide-react';
 
 // Form schema with validation
 const formSchema = z.object({
@@ -20,8 +19,6 @@ const formSchema = z.object({
     message: "Amount must be greater than 0",
   }),
   email: z.string().min(1, "Email is required").email("Invalid email format"),
-  ip_address: z.string().min(1, "IP address is required")
-    .regex(/^(\d{1,3}\.){3}\d{1,3}$/, "Invalid IP address format"),
   billing_first_name: z.string().optional(),
   billing_last_name: z.string().optional(),
   billing_phone: z.string().optional(),
@@ -35,24 +32,9 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-interface FraudResult {
-  fraudScore: number;
-  riskLevel: 'low' | 'medium' | 'high' | 'unknown';
-  message?: string;
-  proxy?: boolean;
-  vpn?: boolean;
-  tor?: boolean;
-}
-
-// Helper type for Supabase responses
-type SupabaseResponse<T> = {
-  data: T | null;
-  error: any;
-};
-
 const ManualTransactionForm = () => {
   const { user } = useAuth();
-  const [result, setResult] = useState<FraudResult | null>(null);
+  const [result, setResult] = useState<FraudCheckResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<FormValues>({
@@ -60,7 +42,6 @@ const ManualTransactionForm = () => {
     defaultValues: {
       amount: '',
       email: '',
-      ip_address: '192.168.1.1', // Default placeholder
       billing_first_name: '',
       billing_last_name: '',
       billing_phone: '',
@@ -90,12 +71,10 @@ const ManualTransactionForm = () => {
       console.log("Starting fraud check with user ID:", user.id);
       
       // Prepare parameters for fraud check
-      const params: FraudCheckParams = {
+      const params: FraudCheckRequest = {
         amount: Number(data.amount),
-        timestamp: new Date(),
-        user_id: user.id,
         userEmail: data.email,
-        userIp: data.ip_address,
+        user_id: user.id,
         billing_address: {
           street: data.billing_address || '',
           city: data.billing_city || '',
@@ -107,72 +86,63 @@ const ManualTransactionForm = () => {
         payment_method: data.payment_method,
       };
 
-      // Call fraud detection API
-      const fraudScore = await checkFraud(params);
+      // Call fraud detection Edge Function
+      const fraudResult = await checkFraudWithEdgeFunction(params);
       
-      // Determine risk level based on score
-      let riskLevel: 'low' | 'medium' | 'high' | 'unknown' = 'unknown';
-      if (fraudScore <= 0.3) riskLevel = 'low';
-      else if (fraudScore <= 0.7) riskLevel = 'medium';
-      else riskLevel = 'high';
+      setResult(fraudResult);
 
-      setResult({
-        fraudScore,
-        riskLevel,
-        proxy: fraudScore > 0.5, // Simulated data - in real implementation would come from API
-        vpn: fraudScore > 0.7,   // Simulated data
-        tor: fraudScore > 0.8,   // Simulated data
-      });
-
-      console.log("Inserting transaction with user ID:", user.id);
-      console.log("Transaction data:", {
-        user_id: user.id,
-        amount: Number(data.amount),
-        fraud_score: fraudScore,
-        status: fraudScore > 0.8 ? 'blocked' : fraudScore > 0.5 ? 'flagged' : 'approved'
-      });
-
-      // Store the transaction in Supabase with type casting to help TypeScript
-      const { data: transaction, error } = await supabase
-        .from('transactions')
-        .insert({
+      if (fraudResult.success) {
+        console.log("Inserting transaction with user ID:", user.id);
+        console.log("Transaction data:", {
           user_id: user.id,
           amount: Number(data.amount),
-          fraud_score: fraudScore,
-          status: fraudScore > 0.8 ? 'blocked' : fraudScore > 0.5 ? 'flagged' : 'approved'
-        })
-        .select()
-        .single() as PostgrestResponse<Tables['transactions']>;
+          fraud_score: fraudResult.fraud_score,
+          status: fraudResult.fraud_score > 0.8 ? 'blocked' : fraudResult.fraud_score > 0.5 ? 'flagged' : 'approved'
+        });
 
-      if (error) {
-        console.error("Failed to store transaction:", error);
+        // Store the transaction in Supabase
+        const { data: transaction, error } = await supabase
+          .from('transactions')
+          .insert({
+            user_id: user.id,
+            amount: Number(data.amount),
+            fraud_score: fraudResult.fraud_score,
+            status: fraudResult.fraud_score > 0.8 ? 'blocked' : fraudResult.fraud_score > 0.5 ? 'flagged' : 'approved'
+          })
+          .select()
+          .single() as PostgrestResponse<Tables['transactions']>;
+
+        if (error) {
+          console.error("Failed to store transaction:", error);
+          toast({
+            title: "Database Error",
+            description: "Failed to store transaction result",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Create fraud alert for high-risk transactions
+        if (fraudResult.fraud_score > 0.7 && transaction) {
+          await supabase
+            .from('fraud_alerts')
+            .insert({
+              transaction_id: transaction.id,
+              alert_type: `High Fraud Risk (${(fraudResult.fraud_score * 100).toFixed(0)}%) - ${fraudResult.risk_factors.join(', ')}`,
+            }) as PostgrestResponse<null>;
+        }
+
         toast({
-          title: "Database Error",
-          description: "Failed to store transaction result",
+          title: "Fraud Check Complete",
+          description: `Transaction analyzed with a risk score of ${(fraudResult.fraud_score * 100).toFixed(0)}%`,
+        });
+      } else {
+        toast({
+          title: "Fraud Check Warning",
+          description: fraudResult.error || "Could not complete fraud analysis",
           variant: "destructive",
         });
-        return;
       }
-
-      if (!transaction) {
-        console.error("No transaction data returned");
-        return;
-      }
-
-      // Create fraud alert for high-risk transactions
-      if (fraudScore > 0.7) {
-        await supabase
-          .from('fraud_alerts')
-          .insert({
-            transaction_id: transaction.id,
-            alert_type: `High Fraud Risk (Manual Check: ${(fraudScore * 100).toFixed(0)}%)`,
-          }) as PostgrestResponse<null>;
-      }
-
-      toast({
-        title: "Fraud Check Complete",
-        description: `Transaction analyzed with a risk score of ${(fraudScore * 100).toFixed(0)}%`,
-      });
 
     } catch (err) {
       console.error("Fraud check error:", err);
@@ -186,11 +156,6 @@ const ManualTransactionForm = () => {
     }
   };
 
-  const resetForm = () => {
-    form.reset();
-    setResult(null);
-  };
-
   // Helper function to get appropriate color for risk level
   const getRiskColor = (score: number): string => {
     if (score > 0.7) return "text-red-500";
@@ -201,7 +166,7 @@ const ManualTransactionForm = () => {
   // Helper function to get appropriate icon for risk level
   const getRiskIcon = (score: number) => {
     if (score > 0.7) return <CircleX className="h-5 w-5 text-red-500" />;
-    if (score > 0.4) return <Info className="h-5 w-5 text-amber-500" />;
+    if (score > 0.4) return <AlertTriangle className="h-5 w-5 text-amber-500" />;
     return <Check className="h-5 w-5 text-green-500" />;
   };
 
@@ -211,7 +176,7 @@ const ManualTransactionForm = () => {
         <CardHeader>
           <CardTitle>Manual Fraud Check</CardTitle>
           <CardDescription>
-            Enter transaction details to analyze potential fraud risk
+            Enter transaction details to analyze potential fraud risk using real-time IP analysis
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -241,19 +206,6 @@ const ManualTransactionForm = () => {
                         <FormLabel>Email Address*</FormLabel>
                         <FormControl>
                           <Input type="email" placeholder="user@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="ip_address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>IP Address*</FormLabel>
-                        <FormControl>
-                          <Input placeholder="192.168.1.1" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -405,63 +357,103 @@ const ManualTransactionForm = () => {
           {result && (
             <div className="mt-8 border rounded-lg p-6 bg-slate-50">
               <h3 className="text-xl font-semibold mb-4 flex items-center">
-                {getRiskIcon(result.fraudScore)}
+                {getRiskIcon(result.fraud_score)}
                 <span className="ml-2">Fraud Detection Results</span>
               </h3>
               
-              <div className="space-y-3">
-                <div className="flex justify-between items-center border-b pb-3">
-                  <span className="font-medium">Risk Score:</span>
-                  <span className={`text-lg font-bold ${getRiskColor(result.fraudScore)}`}>
-                    {Math.round(result.fraudScore * 100)}%
-                  </span>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center border-b pb-2">
+                      <span className="font-medium">Risk Score:</span>
+                      <span className={`text-lg font-bold ${getRiskColor(result.fraud_score)}`}>
+                        {Math.round(result.fraud_score * 100)}%
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center border-b pb-2">
+                      <span className="font-medium">Risk Level:</span>
+                      <span className={`font-medium capitalize ${getRiskColor(result.fraud_score)}`}>
+                        {result.risk_level}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center border-b pb-2">
+                      <span className="font-medium flex items-center">
+                        <Globe className="h-4 w-4 mr-1" />
+                        Location:
+                      </span>
+                      <span className="text-sm">{result.city}, {result.region}, {result.country}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center border-b pb-2">
+                      <span className="font-medium">ISP:</span>
+                      <span className="text-sm">{result.isp}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium mr-2">Proxy:</span>
+                      {result.proxy ? (
+                        <CircleX className="h-4 w-4 text-red-500" />
+                      ) : (
+                        <Check className="h-4 w-4 text-green-500" />
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium mr-2">VPN:</span>
+                      {result.vpn ? (
+                        <CircleX className="h-4 w-4 text-red-500" />
+                      ) : (
+                        <Check className="h-4 w-4 text-green-500" />
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium mr-2">TOR:</span>
+                      {result.tor ? (
+                        <CircleX className="h-4 w-4 text-red-500" />
+                      ) : (
+                        <Check className="h-4 w-4 text-green-500" />
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium mr-2">Bot Activity:</span>
+                      {result.bot_status ? (
+                        <CircleX className="h-4 w-4 text-red-500" />
+                      ) : (
+                        <Check className="h-4 w-4 text-green-500" />
+                      )}
+                    </div>
+                  </div>
                 </div>
                 
-                <div className="flex justify-between items-center border-b pb-3">
-                  <span className="font-medium">Risk Level:</span>
-                  <span className={`font-medium capitalize ${getRiskColor(result.fraudScore)}`}>
-                    {result.riskLevel}
-                  </span>
-                </div>
+                {result.risk_factors.length > 0 && (
+                  <div className="mt-4 pt-3 border-t">
+                    <h4 className="font-medium mb-2 flex items-center">
+                      <Shield className="h-4 w-4 mr-1" />
+                      Risk Factors:
+                    </h4>
+                    <ul className="list-disc list-inside text-sm space-y-1">
+                      {result.risk_factors.map((factor, index) => (
+                        <li key={index} className="text-amber-700">{factor}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 
-                <div className="grid grid-cols-2 gap-3 pt-1">
-                  <div className="flex items-center">
-                    <span className="font-medium mr-2">Proxy Detected:</span>
-                    {result.proxy ? (
-                      <CircleX className="h-4 w-4 text-red-500" />
-                    ) : (
-                      <Check className="h-4 w-4 text-green-500" />
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center">
-                    <span className="font-medium mr-2">VPN Detected:</span>
-                    {result.vpn ? (
-                      <CircleX className="h-4 w-4 text-red-500" />
-                    ) : (
-                      <Check className="h-4 w-4 text-green-500" />
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center">
-                    <span className="font-medium mr-2">TOR Network:</span>
-                    {result.tor ? (
-                      <CircleX className="h-4 w-4 text-red-500" />
-                    ) : (
-                      <Check className="h-4 w-4 text-green-500" />
-                    )}
-                  </div>
+                <div className="mt-4 pt-3 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    {result.fraud_score > 0.7 
+                      ? "⚠️ High risk detected. Transaction should be blocked or require additional verification." 
+                      : result.fraud_score > 0.4 
+                        ? "⚡ Medium risk detected. Consider additional verification steps." 
+                        : "✅ Low risk detected. Transaction appears legitimate."}
+                  </p>
                 </div>
-              </div>
-              
-              <div className="mt-4 pt-3 border-t">
-                <p className="text-sm text-muted-foreground">
-                  {result.fraudScore > 0.7 
-                    ? "High risk detected. Transaction may be fraudulent." 
-                    : result.fraudScore > 0.4 
-                      ? "Medium risk detected. Consider additional verification." 
-                      : "Low risk detected. Transaction appears legitimate."}
-                </p>
               </div>
             </div>
           )}
